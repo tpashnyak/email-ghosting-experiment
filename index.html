@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Great Email Ghosting Experiment</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: an inbox-style workspace. Airmail-stripe masthead, round "folders" as a tab rail, one round visible at a time. */
+:root{
+  --paper:#f3f5f9; --surface:#ffffff; --ink:#1a2332; --muted:#566275; --line:#d3d9e3;
+  --red:#b42b25; --navy:#1f3c88; --good:#24744a; --warn:#8a5a00; --tint:#e8edf7; --redtint:#fbeceb;
+  --display:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0f131b; --surface:#171d29; --ink:#e6eaf1; --muted:#a0abbd; --line:#2c3546;
+  --red:#ff7a70; --navy:#9db4ff; --good:#63cf92; --warn:#e8b04f; --tint:#1e2638; --redtint:#2a1a1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0f131b; --surface:#171d29; --ink:#e6eaf1; --muted:#a0abbd; --line:#2c3546;
+  --red:#ff7a70; --navy:#9db4ff; --good:#63cf92; --warn:#e8b04f; --tint:#1e2638; --redtint:#2a1a1c; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:16px/1.55 var(--body)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.stripe{height:8px;background:repeating-linear-gradient(135deg,var(--red) 0 18px,var(--paper) 18px 30px,var(--navy) 30px 48px,var(--paper) 48px 60px)}
+header.mast{display:flex;gap:20px;align-items:center;padding-block:28px 20px;flex-wrap:wrap}
+header.mast svg{flex:none;width:72px;height:72px}
+.mast h1{font-family:var(--display);font-weight:600;font-size:clamp(1.7rem,4.5vw,2.6rem);line-height:1.1;margin:0;text-wrap:balance}
+.mast p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.eyebrow{font:600 .74rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+.who{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.who label{font-size:.9rem;color:var(--muted)}
+input[type=text],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+textarea{min-height:84px;resize:vertical}
+.who input{width:220px}
+:focus-visible{outline:3px solid var(--navy);outline-offset:2px}
+.app{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px;align-items:start}
+nav.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px}
+nav.rail .lbl{font:600 .7rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:8px 10px 6px}
+nav.rail button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border-radius:5px;font-size:.95rem}
+nav.rail button:hover{background:var(--tint)}
+nav.rail button:focus-visible{outline:3px solid var(--navy)}
+nav.rail button[aria-current="page"]{background:var(--tint);font-weight:650;box-shadow:inset 3px 0 0 var(--red)}
+nav.rail .n{font:.8rem var(--mono);color:var(--muted)}
+.tools{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+main section{display:flex;flex-direction:column;gap:20px;min-width:0}
+h2{font-family:var(--display);font-weight:600;font-size:1.85rem;line-height:1.15;margin:0;text-wrap:balance}
+h3{font-size:1.05rem;margin:0}
+.lede{max-width:66ch;margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.goals{margin:0;padding-left:1.2em}
+.goals li+li{margin-top:4px}
+.q{border-left:3px solid var(--navy);padding:4px 0 4px 14px;font-family:var(--display);font-size:1.12rem;font-style:italic;max-width:62ch}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.field legend{font-weight:600;font-size:.95rem}
+.hint{font-size:.85rem;color:var(--muted)}
+.btn{font:600 .92rem var(--body);cursor:pointer;border-radius:6px;padding:9px 14px;border:1px solid var(--navy);background:var(--navy);color:var(--surface)}
+.btn.ghost{background:transparent;color:var(--navy)}
+.btn.small{padding:6px 10px;font-size:.85rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.choice{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:4px}
+.choice:hover{border-color:var(--navy)}
+.choice:focus-visible{outline:3px solid var(--navy)}
+.choice[aria-pressed="true"]{border-color:var(--navy);background:var(--tint)}
+.choice b{font-family:var(--mono);font-size:.78rem;letter-spacing:.08em;color:var(--red)}
+.choice span{font-weight:600}
+/* email mock */
+.mail{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.mail .hd{background:var(--tint);padding:10px 14px;font-size:.88rem;display:grid;grid-template-columns:auto 1fr;gap:2px 10px}
+.mail .hd dt{color:var(--muted)} .mail .hd dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.mail .bd{padding:14px;white-space:pre-line}
+.status{font:600 .78rem var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid currentColor;display:inline-block}
+.status.wait{color:var(--warn)} .status.lost{color:var(--red)} .status.ok{color:var(--good)}
+.clock{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.daybox{font:700 2rem/1 var(--mono);font-variant-numeric:tabular-nums}
+.meter{flex:1;min-width:180px}
+.meter .bar{height:12px;border-radius:99px;background:var(--line);overflow:hidden}
+.meter .fill{height:100%;background:var(--good);transition:width .4s,background .4s}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.log li{display:grid;grid-template-columns:68px 1fr;gap:10px;padding:10px 12px;border-radius:6px;background:var(--paper);border:1px solid var(--line)}
+.log li .d{font:600 .8rem var(--mono);color:var(--muted)}
+.log li.alert{background:var(--redtint);border-color:var(--red)}
+.log li.alert .d{color:var(--red)}
+.callout{background:var(--redtint);border:1px solid var(--red);border-radius:8px;padding:14px 16px}
+.callout.blue{background:var(--tint);border-color:var(--navy)}
+/* timer */
+.timer{font:700 3rem/1 var(--mono);font-variant-numeric:tabular-nums}
+.timer.low{color:var(--red)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.checks li{display:flex;gap:10px;align-items:flex-start}
+.checks .mk{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 .8rem var(--mono);border:2px solid var(--line);color:var(--muted)}
+.checks li.yes .mk{border-color:var(--good);color:var(--good)}
+.checks li.no .mk{border-color:var(--red);color:var(--red)}
+.checks li.flag .mk{border-color:var(--warn);color:var(--warn)}
+.scale{display:flex;gap:6px;flex-wrap:wrap;border:0;padding:0;margin:0}
+.scale label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
+/* triage table */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:.92rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 .74rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--tint)}
+td.t{font:.82rem var(--mono);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+td .from{font-weight:600} td .prev{color:var(--muted);font-size:.86rem}
+td select{min-width:190px}
+.fb{font-size:.84rem;margin-top:6px}
+.fb.match{color:var(--good)} .fb.diff{color:var(--warn)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--paper)}
+.stat .v{font:700 1.6rem/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.stat .k{font-size:.82rem;color:var(--muted)}
+.policy{font-family:var(--display);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:20px;white-space:pre-line;line-height:1.6}
+.policy h4{font-size:1.2rem;margin:0 0 6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.toast{min-height:1.4em;font-size:.88rem;color:var(--good)}
+.navfoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+details.notes{font-size:.92rem;border-top:1px dashed var(--line);padding-top:10px}
+details.notes summary{cursor:pointer;font-weight:600;color:var(--navy)}
+@media (max-width:760px){.app{grid-template-columns:1fr} nav.rail{position:static;flex-direction:row;flex-wrap:wrap} nav.rail .lbl{width:100%} .tools{width:100%;flex-direction:row;flex-wrap:wrap} .who{margin-left:0;width:100%} .who input{width:100%}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="stripe" aria-hidden="true"></div>
+<div class="wrap">
+<header class="mast">
+  <svg viewBox="0 0 72 72" role="img" aria-label="An envelope fading into a ghost">
+    <rect x="6" y="18" width="60" height="40" rx="4" fill="none" stroke="var(--navy)" stroke-width="3"/>
+    <path d="M8 21 L36 42 L64 21" fill="none" stroke="var(--navy)" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M6 58 q5 7 10 0 q5 7 10 0 q5 7 10 0 q5 7 10 0 q5 7 10 0 q5 7 10 0" fill="none" stroke="var(--red)" stroke-width="3" stroke-dasharray="3 4"/>
+    <circle cx="27" cy="50" r="2.4" fill="var(--red)"/><circle cx="45" cy="50" r="2.4" fill="var(--red)"/>
+  </svg>
+  <div style="min-width:0;flex:1 1 360px">
+    <div class="eyebrow">Business Communication Lab</div>
+    <h1>The Great Email Ghosting Experiment</h1>
+    <p>Experience the cost of silence, then practice the three-sentence fix.</p>
+  </div>
+  <div class="who">
+    <label for="studentName">Your name</label>
+    <input type="text" id="studentName" class="sv" autocomplete="name" placeholder="First and last name">
+  </div>
+</header>
+
+<div class="app">
+<nav class="rail" aria-label="Rounds">
+  <div class="lbl">Folders</div>
+  <button data-go="warmup"><span>Warm Up</span><span class="n">00</span></button>
+  <button data-go="round1"><span>You've Been Ghosted</span><span class="n">R1</span></button>
+  <button data-go="round2"><span>60-Second Response</span><span class="n">R2</span></button>
+  <button data-go="round3"><span>Inbox Reality Check</span><span class="n">R3</span></button>
+  <button data-go="round4"><span>Leadership Connection</span><span class="n">R4</span></button>
+  <button data-go="reflect"><span>Final Reflection</span><span class="n">FR</span></button>
+  <div class="tools">
+    <button class="btn small" id="copyAll" type="button">Copy all my work</button>
+    <button class="btn small ghost" id="resetBtn" type="button">Start over</button>
+  </div>
+  <div id="resetConfirm" hidden class="hint" style="padding:8px 4px">
+    Erase every answer on this device?
+    <div class="row" style="margin-top:6px"><button class="btn small" id="resetYes" type="button">Erase</button><button class="btn small ghost" id="resetNo" type="button">Keep</button></div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</nav>
+
+<main>
+<!-- WARM UP -->
+<section id="warmup" data-title="Warm Up">
+  <h2>Warm Up</h2>
+  <div class="panel">
+    <div class="q">Essential Question: How does the timeliness and quality of professional communication influence trust, relationships, and business outcomes?</div>
+    <div>
+      <p style="margin:0 0 6px;font-weight:600">By the end of this lesson, you will learn:</p>
+      <ul class="goals">
+        <li>How silence after a message shapes what customers, employees, applicants, and partners believe about an organization</li>
+        <li>How to write a professional acknowledgment that confirms receipt, shows respect, and sets a realistic next step</li>
+        <li>How to triage a full inbox so you acknowledge what matters without living in your email</li>
+        <li>How leaders set team communication expectations that build accountability and protect personal time</li>
+      </ul>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Quick write</h3>
+    <div class="field">
+      <label for="wu1">Think of a time you sent a message and heard nothing back. What did you assume was going on?</label>
+      <textarea id="wu1" class="sv"></textarea>
+    </div>
+    <div class="field">
+      <label for="wu2">Is a read receipt (or a "seen" notification) the same as a reply? Why or why not?</label>
+      <textarea id="wu2" class="sv"></textarea>
+    </div>
+  </div>
+  <div class="navfoot"><span></span><button class="btn" data-go="round1" type="button">Start Round 1</button></div>
+</section>
+
+<!-- ROUND 1 -->
+<section id="round1" data-title="Round 1: You've Been Ghosted" hidden>
+  <div class="eyebrow">Round 1</div>
+  <h2>You've Been Ghosted!</h2>
+  <p class="lede">With your partner, pick the scenario your teacher assigned. You sent the email. Now wait one business day at a time and watch what silence does to your thinking.</p>
+  <div class="choices" id="scenarioPick" role="group" aria-label="Choose a scenario"></div>
+  <div id="simArea" hidden class="panel">
+    <div class="mail" id="sentMail"></div>
+    <div class="clock">
+      <div><div class="hint">Business days waited</div><div class="daybox" id="dayCount" aria-live="polite">0</div></div>
+      <div class="meter">
+        <div class="row" style="justify-content:space-between"><span class="hint" id="trustLabel">Your confidence in them</span><span class="hint" id="trustPct">100%</span></div>
+        <div class="bar" role="progressbar" aria-labelledby="trustLabel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" id="trustBar"><div class="fill" id="trustFill" style="width:100%"></div></div>
+      </div>
+      <span class="status wait" id="replyStatus">No reply yet</span>
+    </div>
+    <div class="row">
+      <button class="btn" id="waitBtn" type="button">Wait one more business day</button>
+      <button class="btn ghost" id="restartSim" type="button">Restart this scenario</button>
+    </div>
+    <ol class="log" id="thoughtLog" aria-live="polite" aria-label="What goes through your mind"></ol>
+    <div id="lostBox" hidden class="callout"></div>
+  </div>
+  <div class="panel">
+    <h3>Partner discussion</h3>
+    <div class="grid2">
+      <div class="field"><label for="r1a">How did you interpret the silence?</label><textarea id="r1a" class="sv"></textarea></div>
+      <div class="field"><label for="r1b">What assumptions did you start making?</label><textarea id="r1b" class="sv"></textarea></div>
+      <div class="field"><label for="r1c">What would you do next?</label><textarea id="r1c" class="sv"></textarea></div>
+      <div class="field"><label for="r1d">The big question: What business opportunities, relationships, or resources could be lost because nobody acknowledged an email?</label><textarea id="r1d" class="sv"></textarea></div>
+    </div>
+  </div>
+  <div class="navfoot"><button class="btn ghost" data-go="warmup" type="button">Back</button><button class="btn" data-go="round2" type="button">Go to Round 2</button></div>
+</section>
+
+<!-- ROUND 2 -->
+<section id="round2" data-title="Round 2: 60-Second Professional Response" hidden>
+  <div class="eyebrow">Round 2</div>
+  <h2>The 60-Second Professional Response Challenge</h2>
+  <p class="lede">Now you are the recipient. You are busy and cannot give a complete answer yet. Write an acknowledgment that does three things: confirms receipt, shows respect, and sets a realistic next step or follow-up time.</p>
+  <div class="choices" id="incomingPick" role="group" aria-label="Choose an incoming email"></div>
+  <div class="mail" id="incomingMail"></div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div class="timer" id="timer" aria-hidden="true">1:00</div>
+      <div class="row">
+        <button class="btn" id="timerStart" type="button">Start 60 seconds</button>
+        <button class="btn ghost" id="timerPause" type="button" disabled>Pause</button>
+        <button class="btn ghost" id="timerAdd" type="button">Add 30 seconds</button>
+      </div>
+    </div>
+    <div class="sr" id="timerLive" aria-live="assertive"></div>
+    <p class="hint" style="margin:0">The timer is a challenge, not a lock. You can keep typing after it ends, pause it, or add time.</p>
+    <div class="field">
+      <label for="r2reply">Your acknowledgment</label>
+      <textarea id="r2reply" class="sv" style="min-height:130px"></textarea>
+      <span class="hint" id="wordCount">0 words</span>
+    </div>
+    <div class="row"><button class="btn" id="checkReply" type="button">Check my response</button></div>
+    <div id="checkOut" hidden>
+      <ul class="checks" id="checkList"></ul>
+      <p class="hint" style="margin-top:10px">This checker looks for common wording, so it can miss good phrasing. Your partner's judgment counts more.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Swap with your partner</h3>
+    <p class="hint" style="margin:0">Read your partner's acknowledgment, then rate it.</p>
+    <fieldset class="field" style="border:0;padding:0;margin:0">
+      <legend>Would this message increase your confidence in the organization?</legend>
+      <div class="scale">
+        <label><input type="radio" name="peerRate" value="1" class="svr"> 1 Not at all</label>
+        <label><input type="radio" name="peerRate" value="2" class="svr"> 2</label>
+        <label><input type="radio" name="peerRate" value="3" class="svr"> 3 Somewhat</label>
+        <label><input type="radio" name="peerRate" value="4" class="svr"> 4</label>
+        <label><input type="radio" name="peerRate" value="5" class="svr"> 5 Absolutely</label>
+      </div>
+    </fieldset>
+    <div class="field"><label for="r2peer">What made it work, and what one change would make it stronger?</label><textarea id="r2peer" class="sv"></textarea></div>
+  </div>
+  <div class="navfoot"><button class="btn ghost" data-go="round1" type="button">Back</button><button class="btn" data-go="round3" type="button">Go to Round 3</button></div>
+</section>
+
+<!-- ROUND 3 -->
+<section id="round3" data-title="Round 3: Inbox Reality Check" hidden>
+  <div class="eyebrow">Round 3</div>
+  <h2>The Inbox Reality Check</h2>
+  <p class="lede">You just walked out of a morning of meetings. It is 11:52 AM and there are 25 unread emails. Should you answer everything right now? Absolutely not. Sort each one into an action.</p>
+  <div class="panel" style="gap:8px">
+    <h3>Your four actions</h3>
+    <div class="grid2" style="font-size:.92rem">
+      <div><b>Reply fully now:</b> urgent and quick to answer.</div>
+      <div><b>Acknowledge now, reply later:</b> needs research or time, but the sender should know you have it.</div>
+      <div><b>Automated acknowledgment:</b> high volume or routine; a standard auto-reply serves the sender well.</div>
+      <div><b>No reply needed:</b> announcements, FYIs, and marketing.</div>
+    </div>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <caption class="sr">Twenty-five unread emails to triage</caption>
+      <thead><tr><th scope="col">Time</th><th scope="col">Message</th><th scope="col">Your action</th></tr></thead>
+      <tbody id="inboxRows"></tbody>
+    </table>
+  </div>
+  <div class="row"><button class="btn" id="checkTriage" type="button">Compare with suggested actions</button><span class="hint" id="triageProgress">0 of 25 sorted</span></div>
+  <div id="triageOut" hidden class="panel">
+    <div class="stats" id="triageStats"></div>
+    <p class="hint" style="margin:0">Where your choice differs from the suggestion, read the reasoning. Some differences are defensible, so be ready to argue your case.</p>
+  </div>
+  <div class="panel">
+    <div class="field"><label for="r3sys">Write your inbox system: what rules decide whether a message gets a full reply, an acknowledgment, an auto-reply, or nothing?</label><textarea id="r3sys" class="sv"></textarea></div>
+    <div class="field"><label for="r3auto">When is an automated acknowledgment appropriate, and when does a message deserve a personal response?</label><textarea id="r3auto" class="sv"></textarea></div>
+  </div>
+  <div class="navfoot"><button class="btn ghost" data-go="round2" type="button">Back</button><button class="btn" data-go="round4" type="button">Go to Round 4</button></div>
+</section>
+
+<!-- ROUND 4 -->
+<section id="round4" data-title="Round 4: Leadership Connection" hidden>
+  <div class="eyebrow">Round 4</div>
+  <h2>The Leadership Connection</h2>
+  <p class="lede">You manage a team of 15. Several employees say messages to their supervisor often go unanswered for days. Build a team communication policy that fixes the problem without expecting anyone to watch email around the clock.</p>
+  <div class="mail">
+    <dl class="hd"><dt>From</dt><dd>Jordan Reyes, Shift Lead</dd><dt>To</dt><dd>You (Department Manager)</dd><dt>Subject</dt><dd>Feedback from the team</dd></dl>
+    <div class="bd">Hi,
+A few of us talked after Tuesday's huddle. Questions sent to supervisors sometimes sit for three or four days, and we end up guessing or redoing work. Nobody wants people answering emails at 10 PM either. Could we agree on some ground rules?
+Thanks, Jordan</div>
+  </div>
+  <div class="panel">
+    <h3>Policy builder</h3>
+    <div class="grid2">
+      <div class="field"><label for="p1">Routine messages are acknowledged within</label>
+        <select id="p1" class="sv"><option value="">Choose one</option><option>the same business day</option><option>one business day</option><option>two business days</option></select></div>
+      <div class="field"><label for="p2">Truly urgent matters go through</label>
+        <select id="p2" class="sv"><option value="">Choose one</option><option>a phone call or text, not email</option><option>a Teams message marked URGENT</option><option>the designated on-call supervisor</option></select></div>
+      <div class="field"><label for="p3">After working hours</label>
+        <select id="p3" class="sv"><option value="">Choose one</option><option>no one is expected to read or reply to email</option><option>replies wait until the next business morning</option><option>only the on-call person monitors urgent channels</option></select></div>
+      <div class="field"><label for="p4">We stay accountable by</label>
+        <select id="p4" class="sv"><option value="">Choose one</option><option>using out-of-office replies that name a backup contact</option><option>tracking open requests in a shared list</option><option>reviewing response habits at monthly check-ins</option><option>supervisors modeling the policy first</option></select></div>
+    </div>
+    <div class="field"><label for="p5">Define "urgent" for your team (give an example)</label><textarea id="p5" class="sv"></textarea></div>
+    <div class="field"><label for="p6">The twist: explain how your policy respects employees' personal time and work-life boundaries</label><textarea id="p6" class="sv"></textarea></div>
+    <div class="row"><button class="btn" id="buildPolicy" type="button">Preview my policy</button><button class="btn ghost" id="copyPolicy" type="button" hidden>Copy policy</button></div>
+    <div id="policyOut" hidden class="policy" tabindex="-1"></div>
+  </div>
+  <div class="navfoot"><button class="btn ghost" data-go="round3" type="button">Back</button><button class="btn" data-go="reflect" type="button">Go to Final Reflection</button></div>
+</section>
+
+<!-- REFLECTION -->
+<section id="reflect" data-title="Final Reflection" hidden>
+  <div class="eyebrow">Wrap-up</div>
+  <h2>The Final Reflection</h2>
+  <div class="panel">
+    <p style="margin:0;font-family:var(--display);font-size:1.1rem">"When I become a business professional or leader, I want people to describe my communication style as <u>&emsp;&emsp;&emsp;</u> because <u>&emsp;&emsp;&emsp;</u>."</p>
+    <div class="grid2">
+      <div class="field"><label for="f1">My communication style will be described as</label><input type="text" id="f1" class="sv"></div>
+      <div class="field"><label for="f2">because</label><textarea id="f2" class="sv"></textarea></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Self-audit</h3>
+    <p class="hint" style="margin:0">Look through your own recent school or work emails.</p>
+    <div class="field"><label for="f3">One communication habit I will improve, and how:</label><textarea id="f3" class="sv"></textarea></div>
+  </div>
+  <div class="panel">
+    <fieldset class="field" style="border:0;padding:0;margin:0">
+      <legend>What is a reasonable timeframe for acknowledging a professional email?</legend>
+      <div class="scale">
+        <label><input type="radio" name="timeframe" value="Same business day" class="svr"> Same business day</label>
+        <label><input type="radio" name="timeframe" value="One business day" class="svr"> One business day</label>
+        <label><input type="radio" name="timeframe" value="Two business days" class="svr"> Two business days</label>
+        <label><input type="radio" name="timeframe" value="It depends on the message" class="svr"> It depends on the message</label>
+      </div>
+    </fieldset>
+    <div class="field"><label for="f4">Defend your answer.</label><textarea id="f4" class="sv"></textarea></div>
+  </div>
+  <div class="callout blue">
+    <b>Submit your work:</b> select <b>Copy all my work</b> in the folder menu, then paste it into your assignment. Your answers stay saved in this browser until you start over.
+  </div>
+  <div class="navfoot"><button class="btn ghost" data-go="round4" type="button">Back</button><button class="btn" type="button" onclick="document.getElementById('copyAll').click()">Copy all my work</button></div>
+</section>
+</main>
+</div>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const KEY='ghosting-experiment-v1';
+let store={};
+try{store=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){store={}}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(store))}catch(e){}};
+function toast(m){const t=$('#toast');t.textContent=m;clearTimeout(toast.h);toast.h=setTimeout(()=>t.textContent='',3500)}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+/* ---------- navigation ---------- */
+const sections=['warmup','round1','round2','round3','round4','reflect'];
+function go(id,focus){
+  if(!sections.includes(id))id='warmup';
+  sections.forEach(s=>$('#'+s).hidden=s!==id);
+  $$('nav.rail button[data-go]').forEach(b=>{if(b.dataset.go===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+  store._view=id;save();
+  if(focus){const h=$('#'+id+' h2');h.setAttribute('tabindex','-1');h.focus({preventScroll:true});window.scrollTo({top:0,behavior:'smooth'})}
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)go(b.dataset.go,true)});
+const h=(location.hash||'').slice(1);
+go(sections.includes(h)?h:(store._view||'warmup'));
+
+/* ---------- autosave ---------- */
+function restore(){
+  $$('.sv').forEach(el=>{if(store[el.id]!=null)el.value=store[el.id]});
+  $$('.svr').forEach(el=>{el.checked=store['radio_'+el.name]===el.value});
+}
+restore();
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(el.classList.contains('sv')){store[el.id]=el.value;save()}
+  if(el.classList.contains('svr')){store['radio_'+el.name]=el.value;save()}
+});
+document.addEventListener('change',e=>{const el=e.target;if(el.classList.contains('sv')){store[el.id]=el.value;save()}if(el.classList.contains('svr')){store['radio_'+el.name]=el.value;save()}});
+
+/* ---------- ROUND 1 ---------- */
+const SC={
+ A:{role:'The Potential Customer',from:'You (Event Coordinator, Riverbend Booster Club)',to:'sales@southernprintco.com',subj:'Order inquiry: $2,500 in custom shirts for our October 30 event',
+  body:'Hello,\nWe would like to order roughly $2,500 in custom shirts and banners for our fall festival. Could you confirm pricing and whether you can deliver by the 28th?\nThank you!',
+  events:[
+   {d:1,t:'Nothing yet. They are probably busy. It has only been a day.',tr:88},
+   {d:1,t:'A competitor, Magnolia Threads, replied this morning: "Thanks for reaching out! I received your request and will have a full quote to you by Wednesday." They cannot quote yet either, but now you know they have it.',tr:80,alert:true},
+   {d:2,t:'Still silence from Southern Print Co. Did the email go to spam? Is anyone even reading the sales inbox?',tr:55},
+   {d:3,t:'Three business days. Your event is getting close, and Magnolia Threads already sent their quote. You sign with them.',tr:15}],
+  lost:'Southern Print Co. lost a $2,500 order, plus any future orders and referrals from the booster club. The competitor won without offering a better price. They simply said, "I have your message."'},
+ B:{role:'The Job Applicant',from:'You (Applicant)',to:'m.ortiz@harborlinelogistics.com',subj:'Requested materials: writing sample and references',
+  body:'Dear Ms. Ortiz,\nThank you for the conversation on Monday. As requested, I have attached my writing sample and three professional references.\nBest regards',
+  events:[
+   {d:1,t:'Sent! She asked for these, so she will probably confirm she got them.',tr:92},
+   {d:2,t:'No confirmation. Did the attachments go through? You check your Sent folder twice.',tr:78},
+   {d:3,t:'Maybe they filled the position and nobody told you.',tr:60},
+   {d:4,t:'Another company invites you to interview. You say yes. You were excited about Harborline, but now you are hedging.',tr:45,alert:true},
+   {d:5,t:'A week of silence. You begin to wonder: if they communicate like this now, what would it be like to work there?',tr:25}],
+  lost:'Harborline Logistics may lose a strong candidate, and that candidate may tell friends about the experience. Employer reputation is built in moments like this one.'},
+ C:{role:'The Employee',from:'You (Marketing Associate)',to:'Dana Whitfield (your supervisor)',subj:'Question about the client presentation due Friday',
+  body:'Hi Dana,\nQuick clarification on the Lakeside Bank presentation: should the budget slide show the full-year figures or only Q4? I want to make sure I build the right version.\nThanks!',
+  events:[
+   {d:1,t:'You start on other slides while you wait for her answer.',tr:90},
+   {d:2,t:'No reply. You guess "full-year" and start building that version, hoping it is right.',tr:70},
+   {d:3,t:'Still nothing. You wonder whether your question was annoying, or whether your work just is not a priority.',tr:50},
+   {d:4,t:'The day before the deadline, Dana replies: "Q4 only." You rebuild the slide late into the evening.',tr:30,alert:true}],
+  lost:'The company lost hours of rework, the employee lost an evening, and the manager lost some trust. A one-line reply such as "Good question, I will check with the client and tell you by Wednesday" would have prevented all of it.'},
+ D:{role:'The Business Partner',from:'You (Owner, Crescent Bakery)',to:'partnerships@pinehillcoffee.com',subj:'Proposal: co-branded holiday gift boxes',
+  body:'Hello,\nAttached is our proposal for co-branded holiday gift boxes: our pastries with your coffee. To hit the holiday rush we would need to reserve oven time and packaging by November 10.\nLooking forward to your thoughts.',
+  events:[
+   {d:1,t:'You are excited. You sketch out a production schedule just in case.',tr:90},
+   {d:2,t:'Nothing yet. Should you hold the oven time, or release it to other orders?',tr:75},
+   {d:3,t:'The packaging supplier needs a deposit soon. You hold off because you do not know if the deal is real.',tr:55},
+   {d:5,t:'Another shop asks to book your holiday oven time. With no word from Pine Hill, you say yes.',tr:25,alert:true}],
+  lost:'Both businesses lost a holiday collaboration, and the bakery spent days in limbo holding resources it could have used. Silence created uncertainty, and uncertainty has a cost.'}
+};
+let cur=null,step=0;
+const pick=$('#scenarioPick');
+Object.entries(SC).forEach(([k,s])=>{
+  const b=document.createElement('button');b.type='button';b.className='choice';b.dataset.k=k;b.setAttribute('aria-pressed','false');
+  b.innerHTML=`<b>SCENARIO ${k}</b><span>${s.role}</span>`;pick.appendChild(b);
+});
+pick.addEventListener('click',e=>{const b=e.target.closest('.choice');if(!b)return;loadScenario(b.dataset.k)});
+function loadScenario(k){
+  cur=k;step=0;store._scenario=k;save();
+  $$('#scenarioPick .choice').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===k)));
+  const s=SC[k];$('#simArea').hidden=false;
+  $('#sentMail').innerHTML=`<dl class="hd"><dt>From</dt><dd>${esc(s.from)}</dd><dt>To</dt><dd>${esc(s.to)}</dd><dt>Subject</dt><dd>${esc(s.subj)}</dd><dt>Status</dt><dd>Sent</dd></dl><div class="bd">${esc(s.body)}</div>`;
+  $('#thoughtLog').innerHTML='';$('#lostBox').hidden=true;$('#waitBtn').disabled=false;
+  setTrust(100,0);$('#replyStatus').className='status wait';$('#replyStatus').textContent='No reply yet';
+}
+function setTrust(v,d){
+  $('#trustFill').style.width=v+'%';$('#trustPct').textContent=v+'%';$('#trustBar').setAttribute('aria-valuenow',v);
+  $('#trustFill').style.background=v>66?'var(--good)':v>35?'var(--warn)':'var(--red)';
+  $('#dayCount').textContent=d;
+}
+$('#waitBtn').addEventListener('click',()=>{
+  const s=SC[cur];const ev=s.events[step];if(!ev)return;
+  const li=document.createElement('li');if(ev.alert)li.className='alert';
+  li.innerHTML=`<span class="d">DAY ${ev.d}</span><span>${esc(ev.t)}</span>`;$('#thoughtLog').appendChild(li);
+  setTrust(ev.tr,ev.d);step++;
+  if(step>=s.events.length){
+    $('#waitBtn').disabled=true;$('#replyStatus').className='status lost';$('#replyStatus').textContent='Opportunity lost';
+    $('#lostBox').hidden=false;$('#lostBox').innerHTML=`<b>What silence cost:</b> ${esc(s.lost)}`;
+  }
+});
+$('#restartSim').addEventListener('click',()=>cur&&loadScenario(cur));
+if(store._scenario)loadScenario(store._scenario);
+
+/* ---------- ROUND 2 ---------- */
+const IN=[
+ {k:'cust',lbl:'Customer inquiry',from:'Alicia Grant',subj:'Catering for 80 guests on November 14?',body:'Hi there,\nI am planning a company luncheon for about 80 people on November 14. Do you offer catering at that size, and what would pricing look like? We need to decide by next week.\nThanks, Alicia'},
+ {k:'app',lbl:'Job applicant',from:'Marcus Lee',subj:'Following up: Operations Assistant application',body:'Hello,\nI interviewed for the Operations Assistant role last Tuesday and wanted to follow up on next steps. I remain very interested in the position.\nBest, Marcus'},
+ {k:'emp',lbl:'Employee question',from:'Priya Nair (your team)',subj:'Can I switch my Saturday shift?',body:'Hi,\nMy sister is getting married on the 22nd. Is it possible to swap my Saturday shift that weekend? I can cover a Sunday instead.\nThank you, Priya'},
+ {k:'part',lbl:'Partner proposal',from:'Devon Brooks, Pine Hill Coffee',subj:'Proposal for a joint holiday promotion',body:'Hello,\nAttached is a proposal for a co-branded holiday promotion. We would need to lock in packaging by November 10. Let us know what you think!\nDevon'}
+];
+const ip=$('#incomingPick');
+IN.forEach((m,i)=>{const b=document.createElement('button');b.type='button';b.className='choice';b.dataset.i=i;b.setAttribute('aria-pressed','false');b.innerHTML=`<b>INCOMING</b><span>${m.lbl}</span>`;ip.appendChild(b)});
+function loadIn(i){
+  store._incoming=i;save();const m=IN[i];
+  $$('#incomingPick .choice').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.i===i)));
+  $('#incomingMail').innerHTML=`<dl class="hd"><dt>From</dt><dd>${esc(m.from)}</dd><dt>Subject</dt><dd>${esc(m.subj)}</dd></dl><div class="bd">${esc(m.body)}</div>`;
+}
+ip.addEventListener('click',e=>{const b=e.target.closest('.choice');if(b)loadIn(+b.dataset.i)});
+loadIn(store._incoming!=null?store._incoming:0);
+
+let left=60,tick=null;
+function drawT(){const m=Math.floor(left/60),s=left%60;$('#timer').textContent=m+':'+String(s).padStart(2,'0');$('#timer').classList.toggle('low',left<=10)}
+function announce(t){$('#timerLive').textContent=t}
+$('#timerStart').addEventListener('click',()=>{
+  if(tick)return;if(left<=0)left=60;drawT();announce(left+' seconds. Timer started.');
+  $('#timerPause').disabled=false;$('#timerStart').textContent='Running';$('#timerStart').disabled=true;$('#r2reply').focus();
+  tick=setInterval(()=>{left--;drawT();if(left===30||left===10)announce(left+' seconds left');
+    if(left<=0){clearInterval(tick);tick=null;announce('Time. Finish your sentence and check your response.');$('#timerStart').disabled=false;$('#timerStart').textContent='Restart 60 seconds';$('#timerPause').disabled=true}},1000);
+});
+$('#timerPause').addEventListener('click',()=>{clearInterval(tick);tick=null;announce('Timer paused');$('#timerStart').disabled=false;$('#timerStart').textContent='Resume';$('#timerPause').disabled=true});
+$('#timerAdd').addEventListener('click',()=>{left+=30;drawT();announce('Added 30 seconds. '+left+' seconds left.')});
+drawT();
+
+const wc=()=>{const n=($('#r2reply').value.trim().match(/\S+/g)||[]).length;$('#wordCount').textContent=n+(n===1?' word':' words');return n};
+$('#r2reply').addEventListener('input',wc);wc();
+$('#checkReply').addEventListener('click',()=>{
+  const t=$('#r2reply').value,n=wc();
+  const day='(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|end of (the )?(day|week)|this (afternoon|morning|week)|next week|noon|\\d)';
+  const items=[
+   [/\b(receiv|got your|have your|thank(s| you) for (reaching|contacting|your|sending|the|following|letting|getting))/i.test(t),'Confirms receipt','Show the sender their message arrived, for example "I received your email."'],
+   [/\b(thank|appreciate|grateful|glad|pleasure|happy to)/i.test(t),'Shows respect and professionalism','Add a thank-you or a note of appreciation.'],
+   [new RegExp('\\b(by|before|within|no later than|on|until)\\s+'+day,'i').test(t)||/\b(\d+\s*(business )?(hours?|days?))\b/i.test(t),'Sets a realistic next step and time','Name when you will follow up, for example "by Thursday afternoon."'],
+   [n>0&&n<=80,'Concise (80 words or fewer)',n>80?'Trim it. An acknowledgment is a quick confirmation, not the full answer.':'Write your response first.']
+  ];
+  const flags=[];
+  if(/\b(asap|lol|bro|hey|ya|u|thx|k)\b/i.test(t))flags.push('Casual wording detected. Keep the tone professional.');
+  if(/\b(right away|immediately|24\/7|any time|anytime)\b/i.test(t))flags.push('Careful not to overpromise. Pick a time you can actually keep.');
+  if(/!{2,}/.test(t))flags.push('Use one exclamation point at most.');
+  const L=$('#checkList');L.innerHTML='';
+  items.forEach(([ok,lbl,tip])=>{const li=document.createElement('li');li.className=ok?'yes':'no';li.innerHTML=`<span class="mk" aria-hidden="true">${ok?'✓':'✗'}</span><span><b>${ok?'Yes':'Not yet'}:</b> ${lbl}${ok?'':' <span class="hint">'+tip+'</span>'}</span>`;L.appendChild(li)});
+  flags.forEach(f=>{const li=document.createElement('li');li.className='flag';li.innerHTML=`<span class="mk" aria-hidden="true">!</span><span><b>Check:</b> ${f}</span>`;L.appendChild(li)});
+  $('#checkOut').hidden=false;toast(items.filter(x=>x[0]).length+' of 4 checks met');
+});
+
+/* ---------- ROUND 3 ---------- */
+const ACT={reply:'Reply fully now',ack:'Acknowledge now, reply later',auto:'Automated acknowledgment',none:'No reply needed'};
+const MAIL=[
+ ['8:02','Customer: Renee Walsh','Order #4471 arrived damaged','Need a replacement before my event Saturday.','ack','She needs to know you are on it today, but finding a replacement takes research.'],
+ ['8:10','HR Department','Reminder: Benefits enrollment closes Nov 15','All staff announcement.','none','Mass announcement. Add the date to your calendar instead.'],
+ ['8:15','Warehouse: Luis','Loading dock door will not close','Truck arriving at 1:00. What do we do?','reply','Urgent operational problem with a deadline in about an hour.'],
+ ['8:30','All Staff','Cake in the break room for Dana','Happy birthday Dana!','none','Celebrate in person; no reply needed.'],
+ ['8:41','Prospect: Hollis Events','Quote request: 200 branded tumblers','Can you send pricing and lead time?','ack','A new customer. Acknowledge now so they do not shop elsewhere; the quote takes time.'],
+ ['9:05','Your supervisor','Q3 sales numbers by 3 PM?','Need them for the leadership meeting.','reply','Your boss has a same-day deadline, and you can likely pull the numbers quickly.'],
+ ['9:12','Industry Weekly','10 retail trends for 2027','Newsletter','none','Subscription content. Read it later or not at all.'],
+ ['9:20','Applicant: Marcus Lee','Following up on my interview','I interviewed last Tuesday.','ack','Candidates judge your company by how you treat them. Confirm and give a timeline.'],
+ ['9:33','Vendor: Delta Supply','Invoice #8812 attached','Net 30 terms.','auto','Routine paperwork; an automatic receipt from accounts payable serves the vendor.'],
+ ['9:40','Team: Kayla','Out sick today','Can someone cover my 2 PM shift?','reply','Coverage must be decided before 2 PM.'],
+ ['9:48','Website form','What are your store hours?','General question.','auto','An auto-reply with hours and an FAQ link answers it instantly.'],
+ ['10:02','IT Department','Scheduled maintenance Saturday 2 to 4 AM','No action required.','none','Informational only.'],
+ ['10:05','Partner: Pine Hill Coffee','Revised proposal for holiday promotion','Deadline Nov 10.','ack','A real relationship and a deadline. Confirm receipt and when you will review it.'],
+ ['10:17','Customer: Tom Barrett','Complaint about rude service','I would like a manager to call me.','ack','Personal and same-day. An automated reply here would feel dismissive.'],
+ ['10:26','Colleague','FYI: Notes from Monday meeting','No reply needed.','none','The sender said it: FYI.'],
+ ['10:31','Customer: J. Ellis','Did my payment go through?','Charged twice?','reply','Money worries deserve a quick, personal answer, and you can check fast.'],
+ ['10:40','Calendar','Invitation: Budget review Thursday 10 AM','Accept, decline, or propose.','reply','Responding to the invite takes seconds and helps the organizer plan.'],
+ ['10:44','Grow Fast Marketing','Boost your SEO by 300%!','Cold sales pitch.','none','Unsolicited marketing.'],
+ ['10:58','Your supervisor','Ideas on restructuring the schedule?','No rush, by next Friday.','ack','Confirm you saw it and will send ideas by Friday.'],
+ ['11:06','Bay County Schools','Bulk order: need W-9 and pricing','For 12 schools.','ack','Large opportunity; gathering documents takes time, so acknowledge today.'],
+ ['11:12','careers@ inbox','14 new applications received','For the Sales Associate posting.','auto','High volume. An automated confirmation to each applicant is professional and fair.'],
+ ['11:20','Safety Officer','Recall: product batch #B-22','Confirm pulled from shelves by noon.','reply','Safety and a deadline in minutes.'],
+ ['11:31','Intern: Sam','Could you review my report draft?','Whenever you have time.','ack','Show the intern their work matters and give a realistic date.'],
+ ['11:39','ShopSurvey','Rate your recent purchase','Survey.','none','Optional survey.'],
+ ['11:47','events@ inbox','Registration questions (sent 11 PM)','Three attendees asking about parking.','auto','An auto-reply with parking details covers common questions; follow up on anything unusual.']
+];
+const tb=$('#inboxRows');
+MAIL.forEach((m,i)=>{
+  const id='t3_'+i;const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="t">${m[0]}</td><td><div class="from">${esc(m[1])}</div><div>${esc(m[2])}</div><div class="prev">${esc(m[3])}</div><div class="fb" id="fb_${i}" hidden></div></td>
+  <td><label class="sr" for="${id}">Action for: ${esc(m[2])}</label><select id="${id}" class="sv tri"><option value="">Choose an action</option>${Object.entries(ACT).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></td>`;
+  tb.appendChild(tr);
+});
+restore();
+function prog(){const n=$$('.tri').filter(s=>s.value).length;$('#triageProgress').textContent=n+' of 25 sorted';return n}
+tb.addEventListener('change',prog);prog();
+$('#checkTriage').addEventListener('click',()=>{
+  let match=0,mins=0;const cnt={reply:0,ack:0,auto:0,none:0};
+  const cost={reply:6,ack:1,auto:0,none:0};
+  MAIL.forEach((m,i)=>{const v=$('#t3_'+i).value;const fb=$('#fb_'+i);fb.hidden=false;
+    if(v){cnt[v]++;mins+=cost[v]}
+    if(!v){fb.className='fb diff';fb.textContent='Not sorted yet. Suggested: '+ACT[m[4]]+'. '+m[5]}
+    else if(v===m[4]){match++;fb.className='fb match';fb.textContent='Matches the suggestion. '+m[5]}
+    else{fb.className='fb diff';fb.textContent='Suggested: '+ACT[m[4]]+'. '+m[5]}
+  });
+  $('#triageStats').innerHTML=[
+   [match+'/25','match the suggested action'],
+   [cnt.reply,'full replies now'],[cnt.ack,'quick acknowledgments'],[cnt.auto+cnt.none,'auto or no reply'],
+   ['~'+mins+' min','estimated time for your plan'],['~150 min','if you fully answered all 25']
+  ].map(([v,k])=>`<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+  $('#triageOut').hidden=false;store._triageScore=match;save();toast(match+' of 25 match the suggestions');
+});
+
+/* ---------- ROUND 4 ---------- */
+function policyText(){
+  const v=id=>$('#'+id).value.trim();
+  const miss=['p1','p2','p3','p4'].filter(id=>!v(id));
+  if(miss.length)return null;
+  return `TEAM COMMUNICATION POLICY
+Purpose: Every message gets a timely answer, and every person keeps their personal time.
+
+1. Response time. Routine messages are acknowledged within ${v('p1')}. An acknowledgment confirms receipt and names when a full answer will follow.
+2. Urgent matters. Truly urgent issues go through ${v('p2')}.${v('p5')?' Our definition of urgent: '+v('p5'):''}
+3. After hours. After working hours, ${v('p3')}.
+4. Accountability. We stay accountable by ${v('p4')}.
+5. Personal time. ${v('p6')||'(Explain how this policy protects work-life boundaries.)'}`;
+}
+$('#buildPolicy').addEventListener('click',()=>{
+  const t=policyText();const out=$('#policyOut');out.hidden=false;
+  if(!t){out.textContent='Choose an option in all four drop-down menus to build your policy.';$('#copyPolicy').hidden=true;out.focus();return}
+  const [first,...rest]=t.split('\n');out.innerHTML='<h4>Team Communication Policy</h4>'+esc(rest.join('\n'));
+  $('#copyPolicy').hidden=false;out.focus();
+});
+async function copyText(t,okMsg){
+  try{await navigator.clipboard.writeText(t);toast(okMsg)}
+  catch(e){const ta=document.createElement('textarea');ta.value=t;ta.setAttribute('aria-label','Copy this text');ta.style.cssText='position:fixed;inset:20% 10%;width:80%;height:60%;z-index:99';document.body.appendChild(ta);ta.select();toast('Press Ctrl+C or Cmd+C to copy, then click outside the box.');ta.addEventListener('blur',()=>ta.remove())}
+}
+$('#copyPolicy').addEventListener('click',()=>{const t=policyText();if(t)copyText(t,'Policy copied')});
+
+/* ---------- export & reset ---------- */
+$('#copyAll').addEventListener('click',()=>{
+  const lines=['THE GREAT EMAIL GHOSTING EXPERIMENT','Name: '+($('#studentName').value||'(not entered)'),''];
+  sections.forEach(id=>{
+    const sec=$('#'+id);lines.push('== '+sec.dataset.title.toUpperCase()+' ==');
+    if(id==='round1'&&store._scenario)lines.push('Scenario: '+store._scenario+' ('+SC[store._scenario].role+')');
+    if(id==='round2')lines.push('Incoming email: '+IN[store._incoming||0].lbl);
+    if(id==='round3'){
+      MAIL.forEach((m,i)=>{const v=$('#t3_'+i).value;lines.push((i+1)+'. '+m[2]+': '+(v?ACT[v]:'(not sorted)'))});
+      if(store._triageScore!=null)lines.push('Matched suggestions: '+store._triageScore+'/25');
+    }
+    sec.querySelectorAll('.sv:not(.tri)').forEach(el=>{const l=sec.querySelector('label[for="'+el.id+'"]');lines.push((l?l.textContent.trim():el.id)+'\n'+(el.value.trim()||'(blank)'))});
+    sec.querySelectorAll('fieldset').forEach(fs=>{const lg=fs.querySelector('legend').textContent.trim();const c=fs.querySelector('input:checked');lines.push(lg+'\n'+(c?c.value:'(not answered)'))});
+    if(id==='round4'){const p=policyText();if(p)lines.push(p)}
+    lines.push('');
+  });
+  copyText(lines.join('\n'),'All your work is copied. Paste it into your assignment.');
+});
+$('#resetBtn').addEventListener('click',()=>{$('#resetConfirm').hidden=false;$('#resetNo').focus()});
+$('#resetNo').addEventListener('click',()=>{$('#resetConfirm').hidden=true;$('#resetBtn').focus()});
+$('#resetYes').addEventListener('click',()=>{
+  store={};save();$$('.sv').forEach(el=>el.value='');$$('.svr').forEach(el=>el.checked=false);
+  $$('.fb').forEach(f=>f.hidden=true);$('#triageOut').hidden=true;$('#checkOut').hidden=true;$('#policyOut').hidden=true;$('#copyPolicy').hidden=true;
+  $('#simArea').hidden=true;$$('#scenarioPick .choice').forEach(b=>b.setAttribute('aria-pressed','false'));
+  left=60;drawT();prog();wc();$('#resetConfirm').hidden=true;go('warmup',true);toast('Everything is cleared.');
+});
+})();
+</script>
+</body>
+</html>
